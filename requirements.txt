@@ -1,1 +1,4 @@
-
+python==3.10.18
+gradio==5.35.0
+torch==2.7.1+cu118
+transformers==4.53.0

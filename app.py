@@ -19,17 +19,17 @@ tokenizer = AutoTokenizer.from_pretrained(
     MODEL_NAME,
     cache_dir = MODEL_CACHE_DIR
 )
-model = AutoModelForCausalLM(
+model = AutoModelForCausalLM.from_pretrained(
     MODEL_NAME,
     cache_dir = MODEL_CACHE_DIR,
     device_map = "auto" if device == "cuda" else None,
-    torch_dtypr = torch.float16 if device == "cuda" else torch.float32
-).eavl()
+    torch_dtype = torch.float16 if device == "cuda" else torch.float32
+).eval()
 
 
 # 模型配置文件(调整以优化性能)
 GENERATION_CONFIG = {
-    "max_new_token" : 512,
+    "max_new_tokens" : 512,
     # 是否采用采方法，true使用，False不使用
     # 使用时，会从概率分布中随机采样下一个token
     "do_sample" : True,
@@ -44,7 +44,16 @@ GENERATION_CONFIG = {
 } 
 
 def generate_reponse(message,history):
-    """处理用户输入并生成回复"""
+    """
+    处理用户输入并生成回复
+    
+    Args:
+        message (str) : 用户当前输入的信息
+        history (str) : 历史对话记录，格式为[(user_msg,bot_msg), ...]
+    Returns:
+        str:模型生成的回复文本
+    
+    """
     # 特殊命令处理
     if message.strip() == "/clear":
         return "",[]
@@ -61,12 +70,16 @@ def generate_reponse(message,history):
     # 使用模型聊天模板格式化输入
     model_inputs = tokenizer.apply_chat_template(
         messages,
-        add_generation_prompt = True,
+        # 添加生成提示符
+        add_generation_prompt = True, 
+        # 进行分词处理
         tokenizer = True,
+        # 返回pytorch张量格式
         return_tensors = "pt"
     ).to(device)
 
     # 生成回复
+    # 关闭梯度计算，节省内存并加速推理
     with torch.no_grad():
         outputs = model.generate(
             model_inputs,
@@ -75,7 +88,9 @@ def generate_reponse(message,history):
 
 
     # 解码并返回结果
-    response = outputs[0][model_inputs.shape[-1]]
+    # 提取新生成的部分，去掉输入的部分
+    response = outputs[0][model_inputs.shape[-1]:]
+    # 将token序列解码为文本，跳过特殊token并去除首位空格
     return tokenizer.decode(response,skip_special_tokens=True).strip()
 
 # 创建Gradio界面
@@ -83,17 +98,12 @@ chat_interface = gr.ChatInterface(
     fn = generate_reponse,
     title = "MiniChat",
     description = "基于Qwen1.5-0.5B的智能聊天机器人",
-    examples = ["你好，你是谁？","用Python写一个快速排序"]，
-    css = """.message {font-size: 16px !important}""",
-    retry_btn = None,
-    undo_btn = None,
-    clear_btn = "清空聊天"
+    examples = ["你好，你是谁？","用Python写一个快速排序"],
+    # retry_btn = None,
+    # undo_btn = None,
+    # clear_btn = "清空聊天"
 )
 
-# 启动应用
-chat_interface.launch(
-    server_name = "0.0.0.0",
-    server_port = "7860",
-    share = False,
-    prevent_thread_lock = True
-)
+# 启动应用\
+if __name__ =="__main__":
+    chat_interface.launch()
